@@ -7,7 +7,33 @@
 
 // Load the purge.inc file
 module_load_include('inc', 'purge', 'includes/purge');
-// module_load_include('inc', 'purge', 'includes/defaults');
+// module_load_include('inc', 'purge', 'includes/examples');
+
+/**
+ * Generates UI elements for the Purge UI module.
+ */
+class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
+  // public $form_item = NULL;
+
+  /**
+   * Constructs the API bundle and adds data from the form.
+   */
+  // public function __construct($form, &$form_data, $action = view, $item_type = NULL, $item_name = NULL) {
+  public function __construct() {
+    $form = array();
+    // first get the API bundle from the parent.
+    parent::__construct();
+    // Then get the form item.
+
+    // The update the form item with the form values.
+
+    // Generate the form for the form item.
+
+
+    return $form;
+  }
+
+}
 
 /**
  * Menu callback for purge admin settings.
@@ -30,7 +56,7 @@ function purge_configuration_form($form, &$form_state, $item_type = NULL) {
   );
   $options = array();
   // Get all basic configuration.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleUI();
   // See if the type was passed as an agruement.
   if ($item_type) {
     $types = array($item_type);
@@ -129,7 +155,7 @@ function purge_configuration_form($form, &$form_state, $item_type = NULL) {
  */
 function purge_item_add_form($form, &$form_state, $item_type) {
   // Load the bundle.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleUI();
   // And load the example bundle.
   module_load_include('inc', 'purge', 'includes/defaults');
   $example_bundle = new PurgeBundleExample();
@@ -210,21 +236,21 @@ function purge_item_add_form_submit($form, &$form_state) {
  */
 function purge_item_form($form, &$form_state, $item_type, $item_name = NULL, $action = 'view') {
   // First lets load a bundle.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleUI();
   // Select the object we need for this form.
   if ($action == 'add') {
     switch ($item_type) {
       case 'target':
-        $item = new PurgeItemTargetStatic();
+        $item = new PurgeTargetStatic();
         break;
       case 'domain':
-        $item = new PurgeItemDomainStatic();
+        $item = new PurgeDomainStatic();
         break;
       case 'header':
-        $item = new PurgeItemHeaderStatic();
+        $item = new PurgeHeaderStatic();
         break;
       case 'purger':
-        $item = new PurgeItemPurgerBasicUrl();
+        $item = new PurgePurgerBasicUrl();
         break;
     }
     $item_name = '';
@@ -237,7 +263,7 @@ function purge_item_form($form, &$form_state, $item_type, $item_name = NULL, $ac
   elseif ($action == 'example') {
     // Get the example bundle
     module_load_include('inc', 'purge', 'includes/defaults');
-    $examples = new PurgeBundleExample();
+    $examples = new PurgePurgerBundleExample();
     $item = clone $examples->{$item_type}[$item_name];
     // Set pointers for purgers.
     if ($item_type == 'purger') {
@@ -600,7 +626,7 @@ function purge_item_form_submit($form, &$form_state) {
  */
 function purge_item_action_callback($item_type, $item_name, $action) {
   // Get the bundle and the item.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleAPI();
   $item = $bundle->{$item_type}[$item_name];
   $access = FALSE;
   // Check if we can enable/disable this item.
@@ -655,7 +681,7 @@ function purge_item_action_callback($item_type, $item_name, $action) {
  */
 function purge_item_action_form($form, &$form_state, $item_type, $item_name, $action) {
   // Get the bundle and the item.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleUI();
   $item = $bundle->{$item_type}[$item_name];
   if ($action == 'delete') {
     $actioned = t('deleted');
@@ -744,7 +770,7 @@ function purge_item_action_form($form, &$form_state, $item_type, $item_name, $ac
  */
 function purge_item_action_form_submit($form, &$form_state) {
   // load the bundle and the item.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleUI();
   $item_type = $form_state['values']['item_type'];
   $item_name = $form_state['values']['item_name'];
   $action = $form_state['values']['action'];
@@ -840,7 +866,7 @@ function purge_option_form($option) {
  * @return object $bundle
  */
 function purge_item_form_load($form, &$form_state) {
-  $bundle = new PurgeBundleFull;
+  $bundle = new PurgePurgerBundleUI;
   $item_action = $form_state['values']['item_action'];
   // See what action is to be taken.
   $item_name = $form_state['values']['machine_name'];
@@ -848,19 +874,19 @@ function purge_item_form_load($form, &$form_state) {
   if ($item_action == 'add' || $item_action == 'clone' || $item_action == 'example') {
     switch ($item_type) {
       case 'target':
-        $bundle->target[$item_name] = new PurgeItemTargetStatic();
+        $bundle->target[$item_name] = new PurgeTargetStatic();
         $item = $bundle->target[$item_name];
         break;
       case 'domain':
-        $bundle->domain[$item_name] = new PurgeItemDomainStatic();
+        $bundle->domain[$item_name] = new PurgeDomainStatic();
         $item = $bundle->domain[$item_name];
         break;
       case 'header':
-        $bundle->header[$item_name] = new PurgeItemHeaderStatic();
+        $bundle->header[$item_name] = new PurgeHeaderStatic();
         $item = $bundle->header[$item_name];
         break;
       case 'purger':
-        $bundle->purger[$item_name] = new PurgeItemPurgerBasicUrl();
+        $bundle->purger[$item_name] = new PurgePurgerBasicUrl();
         $item = $bundle->purger[$item_name];
         break;
     }
@@ -954,7 +980,7 @@ function purge_item_form_load($form, &$form_state) {
 function purge_item_name_exists($item_name) {
   $error = 0;
   // Get a basic bundle.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgeBundleAPI();
   foreach($bundle->type as $type_name => $type) {
     if ($type_name == $item_name) {
       $error = 1;

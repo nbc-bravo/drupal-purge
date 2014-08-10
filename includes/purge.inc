@@ -57,7 +57,7 @@ interface PurgeConfigurable {
  * properties with a value that is cached for reuse.
  */
 interface PurgeCacheable {
-  function get_data_cached();
+  function cache();
 }
 
 /**
@@ -67,6 +67,12 @@ interface PurgeCacheable {
  * properties for each purgable it's used with.
  */
 interface PurgeProcessable {
+  /**
+   * Processes a purgeable.
+   *
+   * @param object $purgeable
+   */
+  // function process($purgeable);
 
 }
 
@@ -102,16 +108,54 @@ interface PurgeProcessableTag {
  *
  * Defines a basic configuration item.
  */
-abstract class PurgeItemBasic {
+abstract class Purge {
   public $name = '';
   public $description = '';
   public $available = 1;
   public $enabled = 1;
   public $access = array(PURGE_ACCESS_FULL);
-  public $provider = 'user';
   public $item = array();
   public $depend = array();
-  public $options;
+  public $option = array();
+
+  /**
+   * Only serialize the static values.
+   */
+  public function __sleep() {
+    $return_properties = array();
+    $basic_properties = array('name', 'description', 'enabled', 'access');
+    $return_properties = $basic_properties;
+
+    // Build the static item array so we don't have to serialize all objects.
+    if (count($this->item)) {
+      // Make sure the item array is serialized once finished.
+      $return_properties[] = 'item';
+      //
+      foreach ($this->item as $type_name => $items) {
+        // Check we're parsing an option and this is a Purger.
+        if ($this instanceof PurgePurger && $type_name = 'option') {
+          // Store the option values in this purges item array.
+          $this->item['option'] = array();
+          foreach ($this->option as $option_name => $option) {
+            $this->item['option'][$option_name] = array();
+            // Get the option values.
+            $option_properties = var_export($item, TRUE);
+            // Set the current value of the option in the item array.
+            $this->item['option'][$option_name] = $option_properties['value'];
+          }
+        }
+        else {
+          $this->item[$type_name] = array();
+          // .
+          foreach ($items as $item_name => $item) {
+            $this->item[$type_name][] = $item_name;
+          }
+        }
+      }
+    }
+
+    return $return_properties;
+  }
 
   /**
    * Does basic dependency checks for builtin dependencies.
@@ -142,14 +186,14 @@ abstract class PurgeItemBasic {
  * Type objects are used to define all the items managed by the Purge module.
  * These objects can be manipulated and extended for advanced uses.
  */
-class PurgeItemType extends PurgeItemBasic {
+class PurgeItem extends Purge {
 
 }
 
 /**
  * Declares dependancies of the dependable items.
  */
-class PurgeItemDepend extends PurgeItemBasic implements PurgeValidateable {
+class PurgeDepend extends Purge implements PurgeValidateable {
 
   /**
    * Validates the dependency.
@@ -164,7 +208,7 @@ class PurgeItemDepend extends PurgeItemBasic implements PurgeValidateable {
 /**
  * Checks if a module is enabled.
  */
-class PurgeItemDependModule extends PurgeItemDepend {
+class PurgeDependModule extends PurgeDepend {
   public $modules = array();
 
   /**
@@ -207,7 +251,7 @@ class PurgeItemDependModule extends PurgeItemDepend {
 /**
  * Checks if the curl library is installed.
  */
-class PurgeItemDependCurl extends PurgeItemDepend {
+class PurgeDependCurl extends PurgeDepend {
 
   /**
    * Declares the dependency on the curl library.
@@ -235,6 +279,13 @@ class PurgeItemDependCurl extends PurgeItemDepend {
   }
 }
 
+/**
+ * Defines options for items.
+ */
+class PurgeOption extends Purge {
+  public $value;
+}
+
 
 /**
  * Abstract Class definition for Purge Targets.
@@ -242,7 +293,7 @@ class PurgeItemDependCurl extends PurgeItemDepend {
  * Targets are the destination of the purge requests. Typically a reverse proxy
  * server or an API endpoint.
  */
-abstract class PurgeItemTarget extends PurgeItemBasic implements PurgeValidateable {
+abstract class PurgeTarget extends Purge implements PurgeValidateable {
   public $urls = array();
 
   /**
@@ -270,7 +321,7 @@ abstract class PurgeItemTarget extends PurgeItemBasic implements PurgeValidateab
 /**
  * Class definition for static targets.
  */
-class PurgeItemTargetStatic extends PurgeItemTarget implements PurgeValidateable {
+class PurgeTargetStatic extends PurgeTarget implements PurgeValidateable {
 
 }
 
@@ -278,12 +329,12 @@ class PurgeItemTargetStatic extends PurgeItemTarget implements PurgeValidateable
 /**
  * Class definition for the Drupal Target.
  */
-class PurgeItemTargetDrupal extends PurgeItemTarget implements PurgeCacheable {
+class PurgeTargetDrupal extends PurgeTarget implements PurgeCacheable {
 
   /**
    * Set api data to url.
    */
-  public function get_data_cached() {
+  public function cache() {
     $base_url = $GLOBALS['base_url'];
     $this->urls = array($base_url);
   }
@@ -292,7 +343,7 @@ class PurgeItemTargetDrupal extends PurgeItemTarget implements PurgeCacheable {
 /**
  * Class definition for domains.
  */
-abstract class PurgeItemDomain extends PurgeItemBasic {
+abstract class PurgeDomain extends Purge {
   public $domains = array();
 
   /**
@@ -318,14 +369,28 @@ abstract class PurgeItemDomain extends PurgeItemBasic {
 /**
  * Class definition for static domain items.
  */
-class PurgeItemDomainStatic extends PurgeItemDomain {
+class PurgeDomainStatic extends PurgeDomain {
 
 }
 
 /**
  * Used the domain supplied by the purgeable url.
  */
-class PurgeItemDomainPurgeableUrl extends PurgeItemDomain implements PurgeProcessableUrl {
+class PurgeDomainPurgeableUrl extends PurgeDomain implements PurgeProcessableUrl {
+
+  /**
+   * Processes the Purgeable URL.
+   */
+  public function process($purgeable) {
+
+  }
+
+  /**
+   * Caches the domain untill the end of this processing.
+   */
+  public function cache() {
+
+  }
 
   /**
    * Get the domain name from the url and set it as the current domains value.
@@ -342,12 +407,12 @@ class PurgeItemDomainPurgeableUrl extends PurgeItemDomain implements PurgeProces
 /**
  * Class definition for the Drupal domain item.
  */
-class PurgeItemDomainDrupal extends PurgeItemDomain implements PurgeCacheable {
+class PurgeDomainDrupal extends PurgeDomain implements PurgeCacheable {
 
   /**
    * Set the domain to the base urls domain.
    */
-  public function get_data_cached() {
+  public function cache() {
     $base_url = $GLOBALS['base_url'];
     $this->domains = array(parse_url($base_url, PHP_URL_HOST));
   }
@@ -356,14 +421,14 @@ class PurgeItemDomainDrupal extends PurgeItemDomain implements PurgeCacheable {
 /**
  * Abstract class definition for Purge Headers.
  */
-abstract class PurgeItemHeader extends PurgeItemBasic {
+abstract class PurgeHeader extends Purge {
   public $headers = array();
 }
 
 /**
  * Class definition for static header items.
  */
-class PurgeItemHeaderStatic extends PurgeItemHeader {
+class PurgeHeaderStatic extends PurgeHeader {
 
 }
 
@@ -371,7 +436,7 @@ class PurgeItemHeaderStatic extends PurgeItemHeader {
 /**
  * Class definition for Queues.
  */
-abstract class PurgeItemQueue extends PurgeItemBasic {
+abstract class PurgeQueue extends Purge {
 
 }
 
@@ -379,7 +444,7 @@ abstract class PurgeItemQueue extends PurgeItemBasic {
  * Class definition for the Fake Queue.
  *   This will issue all requests in the current process.
  */
-class PurgeItemQueueFake extends PurgeItemQueue {
+class PurgeQueueFake extends PurgeQueue {
   public $queue = array();
 
   /**
@@ -397,7 +462,7 @@ class PurgeItemQueueFake extends PurgeItemQueue {
  * Uses the Queue Runner module to off load purges to a daemon, allowing
  * continues and un-delayed purging.
  */
-class PurgeItemQueueRunner extends PurgeItemQueue implements PurgeDependable {
+class PurgeQueueRunner extends PurgeQueue implements PurgeDependable {
   public $queue = array();
 
   /**
@@ -431,46 +496,20 @@ class PurgeItemQueueRunner extends PurgeItemQueue implements PurgeDependable {
     }
     return $errors;
   }
-
-  /**
-   * Declares the module dependancy for the Queue Runner module.
-   */
-  public function depends() {
-    $description = t('Install and enable the Queue Runner module.');
-    // Check the dependecy
-    $pass = $this->check_depend();
-
-    if ($pass) {
-      $description = t('Queue Runner module enabled.');
-    }
-    $dependables = array(
-      'module' => array(
-        'queue_runner' => array(
-          'type' => 'contrib_module',
-          'name' => t('Queue Runner'),
-          'description' => $description,
-          'help url' => 'http://drupal.org/project/queue_runner',
-          'pass' => $pass,
-        ),
-      ),
-    );
-    return $dependables;
-  }
-
 }
 
 
 /**
  * Class definition for Handlers.
  */
-abstract class PurgeItemHandler extends PurgeItemBasic {
+abstract class PurgeHandler extends Purge {
 
 }
 
 /**
  * Class definition for the Drupal HTTP request handler.
  */
-class PurgeItemHandlerDrupal extends PurgeItemHandler {
+class PurgeHandlerDrupal extends PurgeHandler {
 
   /**
    * Function to execute items from a queue.
@@ -497,7 +536,7 @@ class PurgeItemHandlerDrupal extends PurgeItemHandler {
 /**
  * Class definition for the Curl HTTP request library.
  */
-class PurgeItemHandlerCurl extends PurgeItemHandler implements PurgeDependable {
+class PurgeHandlerCurl extends PurgeHandler implements PurgeDependable {
 
   /**
    * Funtion will determine what options are set and call the right execute
@@ -595,23 +634,6 @@ class PurgeItemHandlerCurl extends PurgeItemHandler implements PurgeDependable {
   }
 
   /**
-   * Declares the dependency on the curl library.
-   */
-  public function depends() {
-    $dependables = array(
-      'custom' => array(
-        'curl' => array(
-          'name' => t('The Curl library for PHP.'),
-          'description' => t('Install the curl library.'),
-          'help_link' => 'http://php.net/manual/en/book.curl.php',
-        ),
-      ),
-    );
-    return $dependables;
-  }
-
-
-  /**
    * Checks if the curl library is installed.
    */
   public function check_depend() {
@@ -623,7 +645,7 @@ class PurgeItemHandlerCurl extends PurgeItemHandler implements PurgeDependable {
 /**
  * Class definition for HTTPrl handler.
  */
-class PurgeItemHandlerHttprl extends PurgeItemHandler {
+class PurgeHandlerHttprl extends PurgeHandler {
 
   public function execute($purges, $handler_options) {
     foreach ($purges as $purge_id => $purge) {
@@ -648,48 +670,14 @@ class PurgeItemHandlerHttprl extends PurgeItemHandler {
 /**
  * Class definition for Purgers.
  */
-abstract class PurgeItemPurger extends PurgeItemBasic {
+abstract class PurgePurger extends Purge {
 
 }
 
 /**
  * Class definition for the Basic Url Purger.
  */
-class PurgeItemPurgerBasicUrl extends PurgeItemPurger implements PurgeProcessableUrl {
-  public $pointers = array(
-    'target' => array(),
-    'domain' => array(),
-    'header' => array(),
-    'queue' => array(),
-    'handler' => array(),
-  );
-  public $target = array();
-  public $domain = array();
-  public $header = array();
-  public $queue = array();
-  public $handler = array();
-
-  /**
-   * Serialize the Purger data and replace pointers with a string.
-   */
-  public function __sleep() {
-    // Iterate through all pointers objects and replace with names
-    $this->get_pointers();
-
-    return array('name', 'description', 'enabled', 'access', 'options', 'provider', 'pointers');
-  }
-
-  /**
-   * Populate the flat pointers variable with names of the object pointers.
-   */
-  public function get_pointers() {
-    foreach ($this->pointers as $pointer_type => $pointer_names) {
-        $this->pointers{$pointer_type} = array();
-      foreach ($pointer_names as $pointer_name) {
-        $this->pointers{$pointer_type}[] = $pointer_name;
-      }
-    }
-  }
+class PurgePurgerUrl extends PurgePurger implements PurgeProcessableUrl {
 
   /**
    * Process purgeables.
@@ -771,19 +759,43 @@ class PurgeItemPurgerBasicUrl extends PurgeItemPurger implements PurgeProcessabl
  *
  * This is a basic parent class.
  */
-abstract class PurgeBundleBasic {
+abstract class PurgePurgerBundle extends PurgePurger {
+
   /**
-   * Holds and array of objects of the type PurgeItemType.
-   *
-   * @see PurgeItemType
+   * Override for parents sleep to make sure we include the bundled objects.
    */
-  public $type = array();
-  public $purger = array();
-  public $target = array();
-  public $domain = array();
-  public $header = array();
-  public $queue = array();
-  public $handler = array();
+  public function __sleep() {
+    // First let call the parent function.
+    $return_properties = parent::__sleep();
+    // Add each type to the item array.
+    foreach ($this->item as $type_name => $items) {
+      if (!isset($return_properties[$type_name])) {
+        $return_properties[] = $type_name;
+      }
+    }
+  }
+
+  /**
+   * Set the item objects linked in this bundle when waking up.
+   */
+  public function __wakeup() {
+    // Each item in the item array.
+    foreach ($this->item as $type_name => $items) {
+      foreach ($this->{$type_name} as $bundle_item_name) {
+        // Check if the item contains items.
+        if (isset($this->{$type_name}[$bundle_item_name]->item)) {
+          foreach ($this->{$type_name}[$bundle_item_name]->item as $item_type => $item_names) {
+            foreach ($item_names as $item_name) {
+              // Set the item to the bundle item.
+              $this->{$type_name}[$bundle_item_name]->{$item_type}[$item_name] = $this->{$item_type}[$item_name];
+            }
+          }
+        }
+      }
+    }
+  }
+
+
 
   /**
    * Function to select data from the dataset.
@@ -816,7 +828,7 @@ abstract class PurgeBundleBasic {
  * The full bundle contains the complete purge module configuration. Used for
  * management and operations that require all items, including disabled ones.
  */
-class PurgeBundleFull extends PurgeBundleBasic implements PurgeValidateable {
+class PurgePurgerBundleAPI extends PurgePurgerBundle implements PurgeValidateable {
 
   /**
    * Constructs the full bundle.
@@ -851,7 +863,7 @@ class PurgeBundleFull extends PurgeBundleBasic implements PurgeValidateable {
    */
   public function merge($merge_bundle, $overwrite = 1) {
     // First check if this is actually another bundle.
-    if (!$merge_bundle instanceof PurgeBundleBasic) {
+    if (!$merge_bundle instanceof PurgePurgerBundle) {
       return;
     }
     // Loop through all types.
@@ -915,7 +927,7 @@ class PurgeBundleFull extends PurgeBundleBasic implements PurgeValidateable {
  * Class definition for the runtime bundle.
  *   This class is used for processing the purge requests during runtine.
  */
-class PurgeBundleRuntime extends PurgeBundleBasic {
+class PurgePurgerBundleProcess extends PurgePurgerBundle {
   public $purgeables;
 
   /**
@@ -956,7 +968,7 @@ class PurgeBundleRuntime extends PurgeBundleBasic {
                 $this->{$pointer_type}[$item_name] = unserialize($item_data);
                 // Check if it item has cacheable data
                 if ($this->{$pointer_type}[$item_name] instanceof PurgeCacheable) {
-                  $this->{$pointer_type}[$item_name]->get_data_cached();
+                  $this->{$pointer_type}[$item_name]->cache();
                 }
                 // And link the pointer
                 $this->purger[$purger_name]->{$pointer_type}[$item_name] = $this->{$pointer_type}[$item_name];
@@ -997,19 +1009,6 @@ class PurgeBundleRuntime extends PurgeBundleBasic {
       // }
     }
   }
-
-  /**
-   * Execute the current queues in the fake queue.
-   *   Code will move to queue class once implemented.
-   */
-  public function execute() {
-  // Pass each of the queues.
-    foreach ($this->queue as $queue_name => $queue) {
-      $handler_name = $queue_item['handler'];
-      // Execute the queue.
-      $this->handler[$handler_name]->execute($queue_item['purges'], $queue['handler_options']);
-    }
-  }
 }
 
 /**
@@ -1018,7 +1017,7 @@ class PurgeBundleRuntime extends PurgeBundleBasic {
  * This is a minimal bundle, containing just the handlers needed to
  * process all queued purges.
  */
-class PurgeBundleQueue extends PurgeBundleBasic {
+class PurgePurgerBundleQueue extends PurgePurgerBundle {
 
   /**
    * Constructs the bundle from queue items and executes the purges.
@@ -1055,8 +1054,8 @@ class PurgeBundleQueue extends PurgeBundleBasic {
  * Contains items offered by modules implementing the Purge API.
  *
  */
-abstract class PurgeBundleAPI extends PurgeBundleBasic {
-  public $api = array();
+abstract class PurgePurgerBundleContrib extends PurgePurgerBundle {
+
 }
 
 /**
@@ -1066,7 +1065,7 @@ abstract class PurgeBundleAPI extends PurgeBundleBasic {
  *   Array of urls to remove from the proxy cache using the http purge method.
  */
 function purge_urls($urls) {
-  $bundle = new PurgeBundleRuntime();
+  $bundle = new PurgePurgerBundleProcess();
   $bundle->purgeables['urls'] =  $urls;
   $bundle->process();
 }
@@ -1077,7 +1076,7 @@ function purge_urls($urls) {
  * @param array $queue_items
  */
 function purge_queue_execute($queue_items) {
-  $bundle = new PurgeBundleQueue($queue_items);
+  $bundle = new PurgePurgerBundleQueue($queue_items);
   $results = $bundle->execute($queue_items);
 }
 
@@ -1087,7 +1086,7 @@ function purge_queue_execute($queue_items) {
  */
 function purge_configure($api = NULL) {
   // Start out by fetching the currently configured bundle.
-  $bundle = new PurgeBundleFull();
+  $bundle = new PurgePurgerBundleAPI();
 
   // Invoke hook_purge_configure to get the api bundle.
   $api_modules = module_implements('purge_configure');

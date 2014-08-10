@@ -16,7 +16,7 @@ module_load_include('inc', 'purge', 'includes/defaults');
  */
 function purge_install() {
   // Add the default  configurations
-  $bundle = new PurgeBundleDefault();
+  $bundle = new PurgePurgerBundleDefault();
 
 
   // Reconfigure to load Depend and API bundles.
@@ -30,7 +30,7 @@ function purge_install() {
  */
 function purge_update_7200() {
   //Add the system and template proxy configurations
-  $bundle = new PurgeBundleDefault;
+  $bundle = new PurgePurgerBundleDefault;
   // purge_proxy_config_convert();
   // Save the bundle.
   $bundle->save();
@@ -77,24 +77,6 @@ function purge_proxy_config_convert() {
   }
 }
 
-/**
- * Implements hook_requirements().
- */
-function purge_requirements($phase) {
-  $requirements = array();
-  // Ensure translations don't break at install time
-  $t = get_t();
-  if ($phase == 'install') {
-    // Check if curl is installed and block installation if it is not
-    if (!extension_loaded('curl')) {
-      $requirements['purge'] = array(
-        'description' => $t('PHP curl extension not enabled. See http://php.net/manual/en/curl.installation.php'),
-        'severity' => REQUIREMENT_ERROR
-      );
-    }
-  }
-  return $requirements;
-}
 
 /**
  * Implements hook_uninstall().
