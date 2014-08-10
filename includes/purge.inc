@@ -138,10 +138,8 @@ abstract class Purge {
           $this->item['option'] = array();
           foreach ($this->option as $option_name => $option) {
             $this->item['option'][$option_name] = array();
-            // Get the option values.
-            $option_properties = var_export($item, TRUE);
             // Set the current value of the option in the item array.
-            $this->item['option'][$option_name] = $option_properties['value'];
+            $this->item['option'][$option_name] = $option->value;
           }
         }
         else {
@@ -217,12 +215,12 @@ class PurgeDependModule extends PurgeDepend {
    * @param array $modulenames
    *
    */
-  public function __construct($module_names) {
-    foreach($module_names as $module_name) {
+  // public function __construct($module_names) {
+  //  foreach($module_names as $module_name) {
       // @TODO: Check if things change and call reconfigure if needed.
-      $this->modules[$module_name] = module_exists($module_name);
-    }
-  }
+  //    $this->modules[$module_name] = module_exists($module_name);
+  //  }
+ // }
 
   /**
    * Checks if the modules are installed and enabled.
@@ -671,6 +669,11 @@ class PurgeHandlerHttprl extends PurgeHandler {
  * Class definition for Purgers.
  */
 abstract class PurgePurger extends Purge {
+  public $target = array();
+  public $domain = array();
+  public $header = array();
+  public $queue = array();
+  public $handler = array();
 
 }
 
@@ -678,6 +681,7 @@ abstract class PurgePurger extends Purge {
  * Class definition for the Basic Url Purger.
  */
 class PurgePurgerUrl extends PurgePurger implements PurgeProcessableUrl {
+  public $purger = array();
 
   /**
    * Process purgeables.
@@ -760,6 +764,7 @@ class PurgePurgerUrl extends PurgePurger implements PurgeProcessableUrl {
  * This is a basic parent class.
  */
 abstract class PurgePurgerBundle extends PurgePurger {
+  public $type = array();
 
   /**
    * Override for parents sleep to make sure we include the bundled objects.
@@ -773,20 +778,26 @@ abstract class PurgePurgerBundle extends PurgePurger {
         $return_properties[] = $type_name;
       }
     }
+    return $return_properties;
   }
 
   /**
    * Set the item objects linked in this bundle when waking up.
    */
   public function __wakeup() {
+    // 
+
     // Each item in the item array.
     foreach ($this->item as $type_name => $items) {
-      foreach ($this->{$type_name} as $bundle_item_name) {
+      foreach ($this->{$type_name} as $bundle_item_name => $bundle_item) {
         // Check if the item contains items.
         if (isset($this->{$type_name}[$bundle_item_name]->item)) {
           foreach ($this->{$type_name}[$bundle_item_name]->item as $item_type => $item_names) {
             foreach ($item_names as $item_name) {
               // Set the item to the bundle item.
+              // dprint_r($this->{$type_name}[$bundle_item_name]->{$item_type});
+              // if$this->{$type_name}[$bundle_item_name]->{$item_type} = array();
+
               $this->{$type_name}[$bundle_item_name]->{$item_type}[$item_name] = $this->{$item_type}[$item_name];
             }
           }
@@ -907,17 +918,17 @@ class PurgePurgerBundleAPI extends PurgePurgerBundle implements PurgeValidateabl
    */
   public function save() {
     $data = array();
-    // First let get the item types up
-    $data['type'] = array();
-    foreach ($this->type as $type_name => $type) {
-      $data['type'][$type_name] = serialize($type);
-      $data[$type_name] = array();
-
-      // Now create each item object
-      foreach ($this->{$type_name} as $item_name => $item) {
-        $data[$type_name][$item_name] = serialize($item);
-      }
+    // Serialize this bundle.
+    $data = serialize($this);
+    // Replace the object type in the serialized data with the default api
+    // Strip off the first double quote (object name length)
+    for ($i = 0; $i <= 1; $i++) {
+      $data = ltrim($data, chr(34));
+      $data = strstr($data, chr(34));
     }
+    $data = 'O:20:"PurgePurgerBundleAPI' . $data;
+
+
     // Store the data in the variable
     variable_set('purge_config', $data);
   }

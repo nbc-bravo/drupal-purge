@@ -13,26 +13,192 @@ module_load_include('inc', 'purge', 'includes/purge');
  * Generates UI elements for the Purge UI module.
  */
 class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
-  // public $form_item = NULL;
+  public $action = 'view';
+  public $item_type = NULL;
+  public $item_name = NULL;
+  public $form_item;
+
 
   /**
-   * Constructs the API bundle and adds data from the form.
+   * Sets the bundle with data from the form.
    */
-  // public function __construct($form, &$form_data, $action = view, $item_type = NULL, $item_name = NULL) {
-  public function __construct() {
+  public function set_form_item($action = 'view', $item_type = NULL, $item_name = NULL) {
+    $this->action = $action;
+    $this->item_type = $item_type;
+    $this->item_name = $item_name;
+    // See if we are managing an existing item.
+    if (!is_null($item_type) && !is_null($item_name)) {
+      if ($action == 'view' || $action == 'edit') {
+        $this->form_item = $this->{$item_type}[$item_name];
+      }
+      elseif ($action == 'clone') {
+        $this->form_item = clone $this->{$item_type}[$item_name];
+      }
+      elseif ($action == 'example') {
+        $example_bundle = new PurgePurgerBundleExample();
+        $this->form_item = clone $example_bundle->{$item_type}[$item_name];
+        // @TODO: also add the items of this example in the bundle.
+      }
+      elseif ($action == 'add' && $item_name = 'new') {
+        if ($item_type == 'target') {
+          $this->form_item = new PurgeTargetStatic();
+        }
+        elseif ($item_type == 'domain') {
+          $this->form_item = new PurgeDomainStatic();
+        }
+        elseif ($item_type == 'header') {
+          $this->form_item = new PurgeHeaderStatic();
+        }
+        elseif ($item_type == 'purger') {
+          $this->form_tiem = new PurgePurgerBundleURL();
+        }
+      }
+    }
+  }
+
+
+  /**
+   * Generates a form form the current form settings.
+   *
+   * @return array $form
+   */
+  public function get_form() {
+    // Check if this is a list or an item.
+    if ($this->action == 'view' && is_null($this->item_name)) {
+      $form = $this->get_form_list();
+    }
+    elseif ($this->action == 'view') {
+      $form = $this->get_form_view();
+    }
+    else {
+      $form = $this->get_form_edit();
+    }
+    return $form;
+  }
+
+  /**
+   * Generates a list form.
+   */
+  public function get_form_list() {
     $form = array();
-    // first get the API bundle from the parent.
-    parent::__construct();
-    // Then get the form item.
-
-    // The update the form item with the form values.
-
-    // Generate the form for the form item.
-
+    // Check if we're just showing a single type.
+    if (!is_null($this->item_type)) {
+      $types = array($item_type);
+    }
+    else {
+      $types = $this->item['type'];
+      // Make sure purgers are displayed first.
+      $types = array_diff($types, array('purger', 'type'));
+      array_unshift($types, 'purger');
+    }
+    // Loop through all types.
+    foreach ($types as $type) {
+      $form[$type] = $this->get_form_list_type($type);
+    }
 
     return $form;
   }
 
+  /**
+   * Generates a list of items of a specific type.
+   *
+   * @param string $item_type
+   *
+   * @return array $form
+   */
+  public function get_form_list_type($item_type) {
+    // fieldset for each type
+    $form = array(
+      '#type' => 'fieldset',
+      '#title' => $this->type[$item_type]->name,
+    );
+    $form['description'] = array(
+      '#type' => 'item',
+      '#markup' => $this->type[$item_type]->description,
+    );
+    // Add link
+    if (in_array(PURGE_ACCESS_FULL, $this->type[$item_type]->access)) {
+      $form['add'] = array(
+        '#type' => 'item',
+        '#title' => l(t('Add @type', array('@type' => $this->type[$item_type]->name)), "admin/config/system/purge/add/{$item_type}"),
+      );
+    }
+    $table_options = array();
+
+    // Generate the table form.
+    foreach ($this->{$item_type} as $item_name => $item) {
+      $actions = array();
+      // Skip all system items.
+      if (!in_array(PURGE_ACCESS_SYSTEM, $item->access)) {
+        // Check if we'll only show an edit option.
+        if (in_array(PURGE_ACCESS_FULL, $item->access) || in_array(PURGE_ACCESS_ENABLE, $item->access)) {
+          $actions[] = l(t('Edit'), "admin/config/system/purge/edit/{$item_type}/{$item_name}");
+        }
+        // else check if a view action is needed.
+        elseif (in_array(PURGE_ACCESS_VIEW, $item->access)) {
+          $actions[] = l(t('View'), "admin/config/system/purge/view/{$item_type}/{$item_name}");
+        }
+
+        // Enable/disable cations.
+        if (in_array(PURGE_ACCESS_FULL, $item->access) || in_array(PURGE_ACCESS_ENABLE, $item->access)) {
+          if ($item->enabled == 1) {
+            $actions[] = l(t('Disable'), "admin/config/system/purge/disable/{$item_type}/{$item_name}");
+          }
+          else {
+            $actions[] = l(t('Enable'), "admin/config/system/purge/enable/{$item_type}/{$item_name}");
+          }
+        }
+        // Clone
+        if (in_array(PURGE_ACCESS_FULL, $item->access) || in_array(PURGE_ACCESS_CLONE, $item->access)) {
+          $actions[] = l(t('Clone'), "admin/config/system/purge/clone/{$item_type}/{$item_name}");
+        }
+        if (in_array(PURGE_ACCESS_FULL, $item->access)) {
+          $actions[] = l(t('Delete'), "admin/config/system/purge/delete/{$item_type}/{$item_name}");
+        }
+        // Get the curent status.
+        if ($item->enabled == 1) {
+          $status = t('Enabled');
+        }
+        else {
+          $status = t('Disabled');
+        }
+        $table_options[$item_name] = array(
+          'name' => $item->name,
+          'description' => $item->description,
+          'status' => $status,
+          'actions' => implode(' | ', $actions),
+        );
+      }
+    }
+    $form['items'] = array(
+      '#type' => 'tableselect',
+      '#header' => array(
+        'name' => t('Name'),
+        'description' => t('Description'),
+        'status' => t('Status'),
+        'actions' => t('Actions'),
+      ),
+      '#options' => $table_options,
+    );
+    return $form;
+  }
+}
+
+
+/**
+ * Load the api bundle from the variable.
+ *
+ * @return $bundle
+ */
+function purge_get_bundle_ui($form, &$form_state, $action = 'view', $item_type = NULL, $item_name = NULL) {
+  $data = variable_get('purge_config');
+  // Load the UI bundle from the API bundle data.
+  $data = str_replace('O:20:"PurgePurgerBundleAPI"', 'O:19:"PurgePurgerBundleUI"', $data);
+  $bundle = unserialize($data);
+
+  $bundle->set_form_item($action, $item_type, $item_name);
+
+  return $bundle;
 }
 
 /**
@@ -42,111 +208,10 @@ function purge_configuration_form($form, &$form_state, $item_type = NULL) {
   // Debugging
   // purge_expire_cache(array('http://purge72/node/1'));
   // purge_urls(array('http://purge72/node/1'));
+  $bundle = purge_get_bundle_ui($form, $form_state, $action = 'view', $item_type, $item_name = NULL);
   $form = array();
-  $form['purge'] = array(
-    '#type' => 'item',
-    '#title' => t('Purge Configuration'),
-  );
-  // Header to use for each table.
-  $header = array(
-    'name' => t('Name'),
-    'description' => t('Description'),
-    'status' => t('Status'),
-    'actions' => t('Actions'),
-  );
-  $options = array();
-  // Get all basic configuration.
-  $bundle = new PurgePurgerBundleUI();
-  // See if the type was passed as an agruement.
-  if ($item_type) {
-    $types = array($item_type);
-  }
-  // Else set to all available types
-  else {
-    $types = array_keys($bundle->type);
-    // Make sure purgers are displayed first.
-    $types = array_diff($types, array('purger'));
-    array_unshift($types, 'purger');
-  }
-  // Loop through all types.
-  foreach ($types as $type) {
-    // fieldset for each type
-    $form['purge'][$type] = array(
-      '#type' => 'fieldset',
-      '#title' => $bundle->type[$type]->name,
-    );
-    $form['purge'][$type]['description'] = array(
-      '#type' => 'item',
-      '#markup' => $bundle->type[$type]->description,
-    );
-    // Add link
-    if (in_array(PURGE_ACCESS_FULL, $bundle->type[$type]->access)) {
-      $form['purge'][$type]['add'] = array(
-        '#type' => 'item',
-        '#title' => l(t('Add @type', array('@type' => $bundle->type[$type]->name)), "admin/config/system/purge/add/{$type}"),
-      );
-    }
+  $form = $bundle->get_form();
 
-    $options = array();
-    foreach ($bundle->{$type} as $item_name => $item) {
-      // See what actions are available in the UI
-      $actions = array();
-      // Skip all system items.
-      if (!in_array(PURGE_ACCESS_SYSTEM, $item->access)) {
-        // Check if we'll only show an edit option.
-        if (
-          in_array(PURGE_ACCESS_FULL, $item->access) ||
-          in_array(PURGE_ACCESS_ENABLE, $item->access) ||
-          in_array(PURGE_ACCESS_RENAME, $item->access)
-        ) {
-          $actions[] = l(t('Edit'), "admin/config/system/purge/edit/{$type}/{$item_name}");
-        }
-        // else check if a view action is needed.
-        elseif (in_array(PURGE_ACCESS_VIEW, $item->access)) {
-          $actions[] = l(t('View'), "admin/config/system/purge/view/{$type}/{$item_name}");
-        }
-
-        // Enable/Disable actions
-        if (in_array(PURGE_ACCESS_FULL, $item->access) || in_array(PURGE_ACCESS_ENABLE, $item->access)) {
-          if ($item->enabled == 1) {
-            $actions[] = l(t('Disable'), "admin/config/system/purge/disable/{$type}/{$item_name}");
-          }
-          else {
-            $actions[] = l(t('Enable'), "admin/config/system/purge/enable/{$type}/{$item_name}");
-          }
-        }
-        // Clone
-        if (in_array(PURGE_ACCESS_FULL, $item->access) || in_array(PURGE_ACCESS_CLONE, $item->access)) {
-          $actions[] = l(t('Clone'), "admin/config/system/purge/clone/{$type}/{$item_name}");
-        }
-        // Delete action is this is user provided object.
-        if ($item->provider == 'user') {
-          $actions[] = l(t('Delete'), "admin/config/system/purge/delete/{$type}/{$item_name}");
-        }
-      }
-
-      // Get the current status.
-      if ($item->enabled == 1) {
-        $status = t('Enabled');
-      }
-      else {
-        $status = t('Disabled');
-      }
-
-      // Get thte item basic properties.
-      $options[$item_name] = array(
-        'name' => $item->name,
-        'description' => $item->description,
-        'status' => $status,
-        'actions' => implode(' | ', $actions),
-      );
-    }
-    $form['purge'][$type]['items'] = array(
-      '#type' => 'tableselect',
-      '#header' => $header,
-      '#options' => $options,
-    );
-  }
   return $form;
 }
 
@@ -155,10 +220,10 @@ function purge_configuration_form($form, &$form_state, $item_type = NULL) {
  */
 function purge_item_add_form($form, &$form_state, $item_type) {
   // Load the bundle.
-  $bundle = new PurgePurgerBundleUI();
+  $bundle = purge_get_bundle_ui($form, $form_state, 'add', $item_type);
   // And load the example bundle.
   module_load_include('inc', 'purge', 'includes/defaults');
-  $example_bundle = new PurgeBundleExample();
+  $example_bundle = new PurgePurgerBundleExample();
   $form = array();
   // Hidden field with item_type information for later processing.
   $form['item_type'] = array(
@@ -822,14 +887,8 @@ function purge_form_button_callback($form, &$form_state) {
     ;
   }
 
-
-
-
   return $form;
 }
-
-
-
 
 
 /**

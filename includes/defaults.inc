@@ -16,14 +16,15 @@ class PurgePurgerBundleDefault extends PurgePurgerBundleAPI {
   public function __construct() {
     // First declare an array with the static item declarations.
     $this->item = array(
-      ['type'] => array('depend', 'option', 'target', 'domain', 'header', 'queue', 'handler', 'purger'),
-      ['depend'] => array('module', 'curl'),
-      ['option'] => array('method', 'parallel', 'non-blocking', 'batch'),
-      ['target'] => array('drupal_url'),
-      ['header'] => array('gzip'),
-      ['queue'] => array('fake', 'queue_runner'),
-      ['handler'] => array('drupal_http_request', 'curl', 'httprl'),
-      ['purger'] => array(),
+      'type' => array('depend', 'option', 'target', 'domain', 'header', 'queue', 'handler', 'purger'),
+      'depend' => array('module', 'curl'),
+      'option' => array('method', 'parallel', 'non-blocking', 'batch'),
+      'target' => array('drupal_url'),
+      'domain' => array('drupal_domain'),
+      'header' => array('gzip'),
+      'queue' => array('fake', 'runner'),
+      'handler' => array('drupal_http_request', 'curl', 'httprl'),
+      'purger' => array(),
     );
 
     // Lets get the types defined.
@@ -75,6 +76,10 @@ class PurgePurgerBundleDefault extends PurgePurgerBundleAPI {
     $this->depend['module']->name = t('Module Dependency');
     $this->depend['module']->description = t('Declares an items dependency on another Drupal module.');
     $this->depend['module']->access = array(PURGE_ACCESS_LIST);
+
+    $this->depend['php_curl'] = new PurgeDependCurl();
+    $this->depend['php_curl']->name = t('Curl Dependency');
+    $this->depend['php_curl']->description = t('Checks if Curl is available as a PHP Extension.');
 
     // Options.
 
@@ -165,9 +170,9 @@ class PurgePurgerBundleDefault extends PurgePurgerBundleAPI {
         'module' => array(
           'queue_runner' => 0,
         ),
-        'option' => array(
-          'batch' => '25',
-          'parallel' => 1,
+      'option' => array(
+        'batch' => '25',
+        'parallel' => 1,
         ),
       ),
     );
@@ -181,7 +186,7 @@ class PurgePurgerBundleDefault extends PurgePurgerBundleAPI {
     $this->handler['drupal_http_request']->access = array(PURGE_ACCESS_LIST,PURGE_ACCESS_ENABLE);
     $this->handler['drupal_http_request']->item = array(
       'option' => array(
-        'method' => 'http_purge',
+        'method' => 'PURGE',
       ),
     );
 
@@ -193,10 +198,10 @@ class PurgePurgerBundleDefault extends PurgePurgerBundleAPI {
     $this->handler['curl']->item = array(
       'option' => array(
         'method' => 'PURGE',
-        'multi' => 1,
+        'parallel' => 1,
       ),
       'depend' => array(
-        'curl' => 1,
+        'php_curl' => 1,
       ),
     );
 
@@ -211,8 +216,8 @@ class PurgePurgerBundleDefault extends PurgePurgerBundleAPI {
     $this->handler['httprl']->item = array(
       'option' => array(
         'method' => 'PURGE',
-        'multi' => 1,
-        'non_blocking' => 1,
+        'parallel' => 1,
+        'non-blocking' => 1,
       ),
       'depend' => array(
         'module' => array(
@@ -256,7 +261,7 @@ class PurgePurgerBundleExample extends PurgePurgerBundle {
     // Purgers
 
     // Now create the purger objects
-    $this->purger['minimal_purger'] = new PurgePurgerBasicUrl();
+    $this->purger['minimal_purger'] = new PurgePurgerUrl();
     $this->purger['minimal_purger']->name = t('Minimal Purger');
     $this->purger['minimal_purger']->description = t('Uses Drupal native methods to issue the requests.');
     $this->purger['minimal_purger']->item = array(
@@ -271,7 +276,7 @@ class PurgePurgerBundleExample extends PurgePurgerBundle {
     );
 
 
-    $this->purger['default_purger'] = new PurgePurgerBasicUrl();
+    $this->purger['default_purger'] = new PurgePurgerUrl();
     $this->purger['default_purger']->name = t('Default Purger');
     $this->purger['default_purger']->description = t('Uses common settings used for a Varnish setup.');
     $this->purger['default_purger']->item = array(
