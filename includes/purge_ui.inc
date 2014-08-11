@@ -50,7 +50,7 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
           $this->form_item = new PurgeHeaderStatic();
         }
         elseif ($item_type == 'purger') {
-          $this->form_tiem = new PurgePurgerBundleURL();
+          $this->form_item = new PurgePurgerBundleURL();
         }
       }
     }
@@ -182,6 +182,101 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
     );
     return $form;
   }
+
+  /**
+   * Generates a form to view an item.
+   */
+  private function get_form_view() {
+    $form = array();
+    // First get the form with basic information up.
+    $form['purge_basic'] = $this->get_form_view_basic();
+    // Get the status form field.
+    $form['purge_status'] = $this->get_form_view_status();
+    // Get the item specific form field.
+    $form_name = 'purge_' . $this->item_type;
+    $form[$form_name] = $this->get_form_view_{$this->item_type};
+    // Get the buttons.
+    $form['purge_action'] = $this->get_form_action();
+
+    return $form;
+  }
+
+
+  /**
+   * Generates a form to edit an item.
+   *
+   * @return array $form
+   */
+  private function get_form_edit() {
+    $form = array();
+
+    // First get the form with basic information up.
+    $form['purge_basic'] = $this->get_form_edit_basic();
+    // Get the status form field.
+    $form['purge_status'] = $this->get_form_edit_status();
+    // Get the item specific form field.
+    $form_name = 'purge_' . $this->item_type;
+    $form[$form_name] = $this->get_form_edit_{$this->item_type};
+    // Get the buttons.
+    $form['purge_action'] = $this->get_form_action();
+
+    return $form;
+  }
+
+  /**
+   * Generate the basic information view.
+   */
+  private function get_form_view_basic() {
+    $form = array();
+    $form = array(
+      '#type' => 'fieldset',
+      '#title' => t('Basic Item Configuration'),
+    );
+  }
+
+
+  /**
+   * Generate the basic information form.
+   */
+  private function get_form_edit_basic() {
+    $form = array();
+    $form['purge_item'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Basic Item Configuration'),
+    );
+    $form['name'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Name'),
+      '#required' => TRUE,
+      '#description' => t('The user-friendy name for the item.'),
+      '#default_value' => $this->form_item->name,
+    );
+    if ($action == 'add' || $action == 'clone') {
+      $form['machine_name'] = array(
+        '#type' => 'machine_name',
+        '#maxlength' => 21,
+        '#default_value' => '',
+        '#machine_name' => array(
+          'exists' => 'purge_item_name_exists',
+          'source' => array('purge_item', 'name'),
+        ),
+      );
+    }
+    else {
+      $form['machine_name'] = array(
+        '#type' => 'hidden',
+        '#default_value' => $item_name,
+      );
+    }
+    $form['description'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Description'),
+      '#default_value' => $item->description,
+    );
+
+
+  }
+
 }
 
 
@@ -204,11 +299,11 @@ function purge_get_bundle_ui($form, &$form_state, $action = 'view', $item_type =
 /**
  * Menu callback for purge admin settings.
  */
-function purge_configuration_form($form, &$form_state, $item_type = NULL) {
+function purge_configuration_form($form, &$form_state, $action = 'view', $item_type = NULL) {
   // Debugging
   // purge_expire_cache(array('http://purge72/node/1'));
   // purge_urls(array('http://purge72/node/1'));
-  $bundle = purge_get_bundle_ui($form, $form_state, $action = 'view', $item_type, $item_name = NULL);
+  $bundle = purge_get_bundle_ui($form, $form_state, $action , $item_type, $item_name = NULL);
   $form = array();
   $form = $bundle->get_form();
 
@@ -295,11 +390,25 @@ function purge_item_add_form_submit($form, &$form_state) {
   }
 }
 
+/**
+ * Menu callback for the purge item edit form.
+ */
+function purge_item_form($form, &$form_state, $action = 'view', $item_type = NULL, $item_name = NULL) {
+  // Get the bundle.
+  $bundle = purge_get_bundle_ui($form, $form_state, $action = 'view', $item_type, $item_name = NULL);
+  // Get the form
+  $form = array();
+  $form = $bundle->get_form();
+
+  return $form;
+}
+
 
 /**
  * Menu callback for purge item settins.
+ * @TODO REMOVE THIS. Die old functional code, die!.
  */
-function purge_item_form($form, &$form_state, $item_type, $item_name = NULL, $action = 'view') {
+function OLDpurge_item_form($form, &$form_state, $item_type, $item_name = NULL, $action = 'view') {
   // First lets load a bundle.
   $bundle = new PurgePurgerBundleUI();
   // Select the object we need for this form.
