@@ -3,5 +3,4 @@ description = Purge clears urls from reverse proxy caches like Varnish and Squid
 package = Performance and scalability
 core = 7.x
 
-files [] = purge.module
-files [] = includes/purge.inc
+files [] = includes/purge.class.inc
