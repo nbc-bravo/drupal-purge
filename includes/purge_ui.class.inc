@@ -49,7 +49,7 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
           $this->form_item = new PurgeHeaderStatic();
         }
         elseif ($item_type == 'purger') {
-          $this->form_item = new PurgePurgerBundleURL();
+          $this->form_item = new PurgePurgerURL();
         }
       }
     }
@@ -215,9 +215,11 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
     $form['purge_status'] = $this->get_form_edit_status();
     // Get the item specific form field.
     $form_name = 'purge_' . $this->item_type;
-    // $form[$form_name] = $this->get_form_edit_{$this->item_type};
+    $function_name = 'get_form_edit_' . $this->item_type;
+    $form[$form_name] = $this->{$function_name}();
+   // $form[$form_name] = $this->get_form_edit_{$this->item_type}();
     // Get the buttons.
-    // $form['purge_action'] = $this->get_form_action();
+    $form['purge_action'] = $this->get_form_action();
 
     return $form;
   }
@@ -243,7 +245,7 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
       '#type' => 'fieldset',
       '#title' => t('Basic Item Configuration'),
     );
-    $form['name'] = array(
+    $form['purge_item']['item_name'] = array(
       '#type' => 'textfield',
       '#title' => t('Name'),
       '#required' => TRUE,
@@ -251,23 +253,23 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
       '#default_value' => $this->form_item->name,
     );
     if ($this->action == 'add' || $this->action == 'clone') {
-      $form['machine_name'] = array(
+      $form['purge_item']['machine_name'] = array(
         '#type' => 'machine_name',
         '#maxlength' => 21,
         '#default_value' => '',
         '#machine_name' => array(
           'exists' => 'purge_item_name_exists',
-          'source' => array('purge_item', 'name'),
+          'source' => array('purge_basic', 'purge_item', 'item_name'),
         ),
       );
     }
     else {
-      $form['machine_name'] = array(
+      $form['purge_item']['machine_name'] = array(
         '#type' => 'hidden',
         '#default_value' => $this->item_name,
       );
     }
-    $form['description'] = array(
+    $form['purge_item']['description'] = array(
       '#type' => 'textfield',
       '#title' => t('Description'),
       '#default_value' => $this->form_item->description,
@@ -280,8 +282,194 @@ class PurgePurgerBundleUI extends PurgePurgerBundleAPI {
    */
   private function get_form_edit_status() {
     $form = array();
+    $form['enabled'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enabled'),
+      '#description' => t('Disabled items will ignored during operations, even when included in purgers.'),
+      '#default_value' => $this->form_item->enabled,
+    );
+    return $form;
+  }
+
+  /**
+   * Generate the target form elements.
+   */
+  private function get_form_edit_target() {
+    $form = array();
+    $form['target'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Target Configuration',
+    );
+    $form['target']['urls'] = array(
+      '#type' => 'textarea',
+      '#title' => t('URLs'),
+      '#description' => t('The URLs where the Purge requests will be sent to. One URL per line.'),
+      '#required' => true,
+      '#default_value' => implode("\n", $this->form_item->urls),
+    );
+    return $form;
+  }
+
+  /**
+   * Generate the domain form elements.
+   */
+  private function get_form_edit_domain() {
+    $form = array();
+    $form['domain'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Domain Configuration',
+    );
+    $form['domain']['domains'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Domains'),
+      '#description' => t('For each domain name Purge sends out a request. One domain per line.'),
+      '#required' => true,
+      '#default_value' => implode("\n", $this->form_item->domains),
+    );
+    return $form;
+  }
+
+  /**
+   * Generate the header form elements.
+   */
+  private function get_form_edit_header() {
+    $form = array();
+    $form['header'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Header Configuration',
+    );
+    $headers = array();
+    foreach ($this->form_item->headers as $header_key => $header_value) {
+      $headers[] = implode(": ", array($header_key, $header_value));
+    }
+    $form['header']['headers'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Header'),
+      '#description' => t('Headers are added to each request. One header per line. Format: Header: value'),
+      '#required' => true,
+      '#default_value' => implode("\n", $headers),
+    );
+    return $form;
+  }
+
+  /**
+   * Generate the purger form elements.
+   */
+  private function get_form_edit_purger() {
+    $form = array();
+    $form['purger'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Purger configuration',
+    );
+    $select_types = array('target', 'domain', 'header', 'queue', 'handler', 'depend');
+    foreach ($select_types as $pointer_type) {
+      $form['purger'][$pointer_type] = $this->get_select($pointer_type);
+    }
+    return $form;
+  }
+
+  /** Get an item selection form.
+   *  @param $pointer_type string
+   */
+  private function get_select($pointer_type) {
+    // Check if we select a single or multiple values.
+    $multiple = true;
+    if ($pointer_type == 'handler' || $pointer_type == 'queue') {
+      $multiple = false;
+    }
+    $form = array();
+    // Common header
+    $table_header = array(
+      'name' => t('Name'),
+      'description' => t('Description'),
+    );
+    $default_value = array();
+    foreach ($this->{$pointer_type} as $pointer_name => $pointer) {
+      // Get name and description from the item object.
+      $rows[$pointer_name] = array(
+        'name' => $this->{$pointer_type}[$pointer_name]->name,
+        'description' => $this->{$pointer_type}[$pointer_name]->description,
+      );
+      // Add to the default value if selected.
+      if (in_array($pointer_name, $this->form_item->pointers[$pointer_type])) {
+        if ($multiple) {
+          $default_value[$pointer_name] = $pointer_name;
+        }
+        else {
+          $default_value = $pointer_name;
+        }
+      }
+    }
+    // Now lets build the form.
+    $form[$pointer_type] = array(
+      '#type' => 'fieldset',
+      '#title' => $this->type[$pointer_type]->name,
+      '#description' => $this->type[$pointer_type]->description,
+    );
+    $form[$pointer_type][$pointer_type . '_selection'] = array(
+      '#type' => 'tableselect',
+      '#header' => $table_header,
+      '#options' => $rows,
+      '#default_value' => $default_value,
+      '#multiple' => $multiple,
+    );
+    return $form;
+  }
 
 
+
+
+
+
+
+
+  /**
+   * Generate the submit buttons.
+   */
+  private function get_form_action() {
+    $form = array();
+    // Save button.
+    if ($this->action != 'view' && in_array(PURGE_ACCESS_FULL, $this->form_item->access)) {
+      $form['submit']  = array(
+        '#type' => 'submit',
+        '#value' => t('Save'),
+      );
+      if ($this->form_item instanceof PurgeValidateable) {
+        $form['validate'] = array(
+          '#type' => 'button',
+          '#value' => t('Validate'),
+          // '#submit' => array('purge_item_form_validate'),
+        );
+      }
+    }
+    // Enable/disable button.
+    if (in_array(PURGE_ACCESS_ENABLE, $this->form_item->access) || in_array(PURGE_ACCESS_FULL, $this->form_item->access)) {
+      if ($this->form_item->enabled) {
+        $form['disable'] = array(
+          '#type' => 'submit',
+          '#name' => 'disable',
+          '#value' => t('Disable'),
+          '#submit' => array('purge_form_button_callback'),
+        );
+      }
+      else {
+        $form['enable'] = array(
+          '#type' => 'submit',
+          '#name' => 'enable',
+          '#value' => t('Enable'),
+          '#submit' => array('purge_form_button_callback'),
+        );
+      }
+    }
+    // Delete button.
+    if (in_array(PURGE_ACCESS_FULL, $this->form_item->access) && ($this->action == 'edit')) {
+      $form['delete'] = array(
+        '#type' => 'submit',
+        '#name' => 'delete',
+        '#value' => t('Delete'),
+        '#submit' => array('purge_form_button_callback'),
+      );
+    }
     return $form;
   }
 
