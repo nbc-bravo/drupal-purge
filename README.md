@@ -1,4 +1,5 @@
 [//]: # ( clear&&curl -s -F input_files[]=@README.md -F from=markdown -F to=html http://c.docverter.com/convert|tail -n+11|head -n-2 )
+[//]: # ( curl -s -F input_files[]=@README.md -F from=markdown -F to=pdf http://c.docverter.com/convert>README.pdf )
 
 The purge module clears content from reverse proxy caches like
 [Varnish](http://varnish-cache.org/), [Squid](http://www.squid-cache.org/) or
