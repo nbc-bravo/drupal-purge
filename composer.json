@@ -3,5 +3,10 @@
     "description": "Purge stale caches.",
     "type": "drupal-module",
     "license": "GPL-2.0+",
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "extra": {
+      "branch-alias": {
+        "dev-patched": "3.0.x-dev"
+      }
+    }
 }
